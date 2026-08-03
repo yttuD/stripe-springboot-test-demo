@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payment Tester</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            margin-bottom: 2rem;
+        }
+        
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .user-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .user-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #e2e8f0;
+        }
+        
+        .user-email {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+        }
+        
+        .pm-button {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .pm-button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+        
+        .pm-button:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-success { background-color: var(--success); }
+        .btn-fail { background-color: var(--danger); }
+        
+        .log-container {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 1rem;
+            height: 350px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            border: 1px solid var(--glass-border);
+        }
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            word-break: break-all;
+        }
+        .log-time { color: #94a3b8; font-size: 0.8rem; }
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-error { color: #f87171; }
+        .log-warning { color: var(--warning); }
+        .log-req { color: #c084fc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stripe Payment Tester</h1>
+        
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: #cbd5e1;">Tipo de Pago</h3>
+                <button id="btnAdvanceClock" style="display: none; padding: 0.5rem 1rem; background: var(--warning); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    ⏳ Avanzar 1 Mes
+                </button>
+            </div>
+            <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+                <label style="cursor: pointer;">
+                    <input type="radio" name="paymentType" value="single" checked> Pago Único ($25.00)
+                </label>
+                <label style="cursor: pointer;">
+                    <input type="radio" name="paymentType" value="subscription"> Suscripción ($25.00 / mes)
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0; margin-bottom: 1.5rem; color: #cbd5e1;">Usuarios Simulados</h3>
+            <div class="users-grid" id="usersContainer">
+                <div style="text-align: center; color: #94a3b8; width: 100%;">Cargando usuarios...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: #cbd5e1;">Console Log</h3>
+            <div class="log-container" id="logBox">
+                <div class="log-entry"><span class="log-time">[System]</span> <span class="log-info">Iniciando aplicación...</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logBox = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            let colorClass = 'log-info';
+            if (type === 'success') colorClass = 'log-success';
+            if (type === 'warning') colorClass = 'log-warning';
+            if (type === 'error') colorClass = 'log-error';
+            if (type === 'req') colorClass = 'log-req';
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${colorClass}">${message}</span>`;
+            
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                
+                const container = document.getElementById('usersContainer');
+                container.innerHTML = '';
+                
+                users.forEach(user => {
+                    let pmHtml = '';
+                    user.paymentMethods.forEach(pm => {
+                        const btnClass = pm.working ? 'btn-success' : 'btn-fail';
+                        const icon = pm.working ? '✅' : '❌';
+                        pmHtml += `
+                            <button class="pm-button ${btnClass}" onclick="processPayment('${user.id}', '${pm.id}')">
+                                <span>${pm.description}</span>
+                                <span>${icon}</span>
+                            </button>
+                        `;
+                    });
+
+                    container.innerHTML += `
+                        <div class="user-card">
+                            <div class="user-name">${user.name}</div>
+                            <div class="user-email">${user.email}</div>
+                            ${pmHtml}
+                        </div>
+                    `;
+                });
+                log('Usuarios cargados correctamente.', 'success');
+            } catch(e) {
+                log('Error cargando usuarios: ' + e.message, 'error');
+            }
+        }
+
+        async function processPayment(userId, pmId) {
+            const isSub = document.querySelector('input[name="paymentType"]:checked').value === 'subscription';
+            
+            const payload = {
+                amount: 2500, // $25.00
+                currency: 'usd',
+                userId: userId,
+                paymentMethodId: pmId,
+                isSubscription: isSub
+            };
+
+            log(`========================================`, 'info');
+            log(`➡️ Enviando ${isSub ? 'SUSCRIPCIÓN' : 'PAGO ÚNICO'} para usuario: ${userId} usando método: ${pmId}`, 'req');
+
+            try {
+                const response = await fetch('/api/payments/create-payment-intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (data.fallbackLog) {
+                        log(`⚠️ ALERTA DE FALLBACK: ${data.fallbackLog}`, 'warning');
+                    }
+                    log(`✅ Éxito: Pago procesado (${response.status})`, 'success');
+                    log(`Detalles: ID=${data.paymentIntentId}, Status=${data.status}`, 'success');
+                    
+                    if (data.testClockId) {
+                        currentTestClockId = data.testClockId;
+                        testClockMonth = 1; // Resetear al mes 1
+                        document.getElementById('btnAdvanceClock').style.display = 'block';
+                        log(`⏱️ Reloj de prueba atado a esta suscripción: ${currentTestClockId}`, 'info');
+                    }
+                } else {
+                    log(`❌ Fallo: Servidor rechazó el pago (${response.status})`, 'error');
+                    log(`Razón: ${data.error || 'Error desconocido'}`, 'error');
+                    if(data.details) log(`Info extra: ${JSON.stringify(data.details)}`, 'error');
+                }
+            } catch (error) {
+                log(`⚠️ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+
+        let currentTestClockId = null;
+        let testClockMonth = 1;
+
+        document.getElementById('btnAdvanceClock').addEventListener('click', async () => {
+            if (!currentTestClockId) return;
+            log(`========================================`, 'info');
+            log(`⏳ Adelantando el tiempo 30 días para el reloj: ${currentTestClockId}...`, 'req');
+
+            try {
+                const response = await fetch('/api/payments/advance-clock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ testClockId: currentTestClockId })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    testClockMonth++; // Incrementar el contador de meses
+                    log(`✅ ¡Viaje en el tiempo completado!`, 'success');
+                    log(`Nueva fecha congelada: ${data.newTime}`, 'success');
+                    log(`Stripe intentará procesar la factura del mes ${testClockMonth} automáticamente (revisa tu Dashboard).`, 'info');
+                } else {
+                    log(`❌ Fallo al avanzar reloj: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`⚠️ Error de conexión al avanzar reloj: ${error.message}`, 'error');
+            }
+        });
+
+        // Init
+        loadUsers();
+    </script>
+</body>
+</html>
